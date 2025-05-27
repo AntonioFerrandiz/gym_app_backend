@@ -1,28 +1,35 @@
-import { IsEmail, IsNotEmpty, Length, MinLength, Validate } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, IsEnum, IsNumber, Validate } from 'class-validator';
 import { IsDniUniqueConstraint } from 'src/shared/validators/is-dni-unique.validator';
 import { IsEmailUniqueConstraint } from 'src/shared/validators/is-email-unique.validator';
-import { Unique } from 'typeorm';
 
-export class RegisterAdminDto {
+export enum AllowedRoles {
+  GYM_ADMIN = 'gym_admin',
+  GYM_STAFF = 'gym_staff',
+  GYM_MEMBER = 'gym_member',
+}
+
+export class CreateUserByRoleDto {
   @IsNotEmpty()
   firstname: string;
 
   @IsNotEmpty()
   lastname: string;
 
-  @Validate(IsEmailUniqueConstraint)
   @IsEmail()
   @IsNotEmpty()
+  @Validate(IsEmailUniqueConstraint)
   email: string;
 
-  @Validate(IsDniUniqueConstraint)
-  @Length(8)
   @IsNotEmpty()
+  @Validate(IsDniUniqueConstraint)
   dni: number;
-
+  
   @MinLength(6)
   password: string;
 
-  @IsNotEmpty()
+  @IsEnum(AllowedRoles)
+  role: AllowedRoles;
+
+  @IsNumber()
   gym_id: number;
 }

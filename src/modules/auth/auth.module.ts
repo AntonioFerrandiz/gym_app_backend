@@ -8,13 +8,14 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
+import { CommonModule } from 'src/shared/common/common.module';
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
     TypeOrmModule.forFeature([User, Role]),
     JwtModule.registerAsync({
-      imports: [ConfigModule],
+      imports: [ConfigModule, CommonModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
