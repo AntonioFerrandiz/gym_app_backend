@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -8,6 +8,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterAdminDto } from './dto/register-admin.dto';
 import { Role } from './entities/role.entity';
 import { CreateUserByRoleDto } from './dto/create-user-by-role.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Injectable()
 export class AuthService {
@@ -63,7 +65,6 @@ export class AuthService {
 
         const { role, gym_id, ...rest } = dto;
 
-        // Validación de permiso por rol
         const isSuperAdmin = currentUser.role.name === 'super_admin';
         const isGymAdmin = currentUser.role.name === 'gym_admin';
 
@@ -84,7 +85,6 @@ export class AuthService {
             registration_d: new Date(),
             role: roleEntity,
         });
-        console.log('user', user);
         await this.userRepo.save(user);
         return { message: `${role} creado correctamente` };
     }
@@ -103,4 +103,43 @@ export class AuthService {
             access_token: this.jwtService.sign(payload),
         };
     }
+
+    async refreshToken(dto: RefreshTokenDto) {
+    try {
+      const payload = this.jwtService.verify(dto.refreshToken);
+      const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+      if (!user) throw new UnauthorizedException();
+
+      const newAccessToken = this.jwtService.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        gymId: user.gym_id,
+      });
+
+      return { accessToken: newAccessToken };
+    } catch (err) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async logout(userId: number) {
+    
+    return { message: 'Logged out successfully' };
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+
+    const valid = await bcrypt.compare(dto.oldPassword, user.password);
+    console.log(valid)
+    if (!valid) throw new BadRequestException('Contraseña antigua es incorrecta');
+
+    const hashed = await bcrypt.hash(dto.newPassword, 10);
+    user.password = hashed;
+    await this.userRepo.save(user);
+
+    return { message: 'Contraseña cambiada exitosamente' };
+  }
 }
