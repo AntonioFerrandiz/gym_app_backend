@@ -19,10 +19,19 @@ async function bootstrap() {
     .setTitle('Gym API')
     .setDescription('API para gestión de gimnasios')
     .setVersion('1.0')
-    .addBearerAuth() // para probar JWT
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        in: 'header',
+      },
+      'jwt', 
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('api', app, document);
   await app.listen(process.env.PORT ?? 3000);
 
 }
