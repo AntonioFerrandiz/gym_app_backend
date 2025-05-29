@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -10,6 +10,8 @@ import { Role } from './entities/role.entity';
 import { CreateUserByRoleDto } from './dto/create-user-by-role.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { GymsService } from '../gyms/gyms.service';
+import { Gym } from '../gyms/entities/gym.entity';
 
 @Injectable()
 export class AuthService {
@@ -18,7 +20,10 @@ export class AuthService {
         private userRepo: Repository<User>,
         @InjectRepository(Role)
         private roleRepo: Repository<Role>,
+        @InjectRepository(Gym)
+        private gymRepo: Repository<Gym>,
         private jwtService: JwtService,
+        private gymService: GymsService
     ) { }
     async registerAdmin(dto: RegisterAdminDto, currentUser?: User) {
         const userCount = await this.userRepo.count();
@@ -68,8 +73,14 @@ export class AuthService {
         const isSuperAdmin = currentUser.role.name === 'super_admin';
         const isGymAdmin = currentUser.role.name === 'gym_admin';
 
-        if (isGymAdmin && currentUser.gym_id !== gym_id) {
+        if (isGymAdmin && currentUser.gym.id !== gym_id) {
             throw new ForbiddenException('No puede crear usuarios en otro gimnasio');
+        }
+        if (isGymAdmin) {
+            const alreadyHasAdmin = await this.gymService.hasAdminAssigned(dto.gym_id);
+            if (alreadyHasAdmin) {
+                throw new ConflictException('Ya existe un administrador para este gimnasio');
+            }
         }
 
         const roleEntity = await this.roleRepo.findOne({ where: { name: role } });
@@ -78,10 +89,16 @@ export class AuthService {
         }
 
         const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+        const gym = await this.gymRepo.findOne({ where: { id: gym_id } });
+        if (!gym) {
+            throw new NotFoundException('Gimnasio no encontrado');
+        }
+
         const user = this.userRepo.create({
             ...rest,
             password: hashedPassword,
-            gym_id,
+            gym,
             registration_d: new Date(),
             role: roleEntity,
         });
@@ -96,7 +113,7 @@ export class AuthService {
             sub: user.id,
             email: user.email,
             role: user.role,
-            gymId: user.gym_id,
+            gymId: user.gym?.id ?? 0,
         };
 
         return {
@@ -105,41 +122,41 @@ export class AuthService {
     }
 
     async refreshToken(dto: RefreshTokenDto) {
-    try {
-      const payload = this.jwtService.verify(dto.refreshToken);
-      const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-      if (!user) throw new UnauthorizedException();
+        try {
+            const payload = this.jwtService.verify(dto.refreshToken);
+            const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+            if (!user) throw new UnauthorizedException();
 
-      const newAccessToken = this.jwtService.sign({
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        gymId: user.gym_id,
-      });
+            const newAccessToken = this.jwtService.sign({
+                sub: user.id,
+                email: user.email,
+                role: user.role,
+                gymId: user.gym?.id ?? 0,
+            });
 
-      return { accessToken: newAccessToken };
-    } catch (err) {
-      throw new UnauthorizedException('Invalid refresh token');
+            return { accessToken: newAccessToken };
+        } catch (err) {
+            throw new UnauthorizedException('Invalid refresh token');
+        }
     }
-  }
 
-  async logout(userId: number) {
-    
-    return { message: 'Logged out successfully' };
-  }
+    async logout(userId: number) {
 
-  async changePassword(userId: number, dto: ChangePasswordDto) {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException();
+        return { message: 'Logged out successfully' };
+    }
 
-    const valid = await bcrypt.compare(dto.oldPassword, user.password);
-    console.log(valid)
-    if (!valid) throw new BadRequestException('Contraseña antigua es incorrecta');
+    async changePassword(userId: number, dto: ChangePasswordDto) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new UnauthorizedException();
 
-    const hashed = await bcrypt.hash(dto.newPassword, 10);
-    user.password = hashed;
-    await this.userRepo.save(user);
+        const valid = await bcrypt.compare(dto.oldPassword, user.password);
+        console.log(valid)
+        if (!valid) throw new BadRequestException('Contraseña antigua es incorrecta');
 
-    return { message: 'Contraseña cambiada exitosamente' };
-  }
+        const hashed = await bcrypt.hash(dto.newPassword, 10);
+        user.password = hashed;
+        await this.userRepo.save(user);
+
+        return { message: 'Contraseña cambiada exitosamente' };
+    }
 }

@@ -4,6 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
+import { GymsService } from './modules/gyms/gyms.service';
+import { GymsModule } from './modules/gyms/gyms.module';
+import { GymsController } from './modules/gyms/gyms.controller';
 
 @Module({
   imports: [
@@ -21,6 +24,7 @@ import { AuthModule } from './modules/auth/auth.module';
       synchronize: true, // solo para desarrollo
     }),
     AuthModule,
+    GymsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

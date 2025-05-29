@@ -9,11 +9,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { CommonModule } from 'src/shared/common/common.module';
+import { GymsService } from '../gyms/gyms.service';
+import { Gym } from '../gyms/entities/gym.entity';
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
-    TypeOrmModule.forFeature([User, Role]),
+    TypeOrmModule.forFeature([User, Role, Gym]),
     JwtModule.registerAsync({
       imports: [ConfigModule, CommonModule],
       inject: [ConfigService],
@@ -24,6 +26,6 @@ import { CommonModule } from 'src/shared/common/common.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, GymsService],
 })
 export class AuthModule {}
